@@ -1,6 +1,6 @@
 # GenLayer API Toolkit
 
-A reusable library of external API integrations for GenLayer Intelligent Contracts. Provides standardized access to crypto prices, weather, news, GitHub stats and URL health checks — all resolved through Optimistic Democracy consensus.
+A reusable library of external API integrations for GenLayer Intelligent Contracts. Provides standardized access to crypto prices, weather, news, GitHub stats and URL health checks  all resolved through Optimistic Democracy consensus.
 
 ## What is this?
 
