@@ -35,10 +35,10 @@ get_github_stats("genlayerlabs", "genlayer-studio")
 
 Each API has different characteristics that affect how validators will see the data:
 
-- **Crypto prices** change every second, so two validators running a few seconds apart will see slightly different prices — ±2% handles this
-- **Weather** updates every few minutes — ±3°C covers normal variation
-- **GitHub stars** can change between validator runs — ±10 covers new stars being added
-- **Web content** can vary due to caching — ±500 chars handles minor differences
+- **Crypto prices** change every second, so two validators running a few seconds apart will see slightly different prices  ±2% handles this
+- **Weather** updates every few minutes  ±3°C covers normal variation
+- **GitHub stars** can change between validator runs  ±10 covers new stars being added
+- **Web content** can vary due to caching  ±500 chars handles minor differences
 
 ## Built with
 
