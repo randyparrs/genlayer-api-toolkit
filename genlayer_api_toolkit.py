@@ -1,45 +1,18 @@
 # { "Depends": "py-genlayer:test" }
 
-# ============================================================
-#  GenLayer API Toolkit
-#  Tools & Infrastructure Track — GenLayer Hackathon
-#
-#  A reusable library of external API integrations for
-#  Intelligent Contracts. Provides standardized access to:
-#    - Crypto price feeds (CoinGecko)
-#    - Weather data (wttr.in)
-#    - News headlines (Wikipedia current events)
-#    - GitHub repository stats
-#    - Domain/URL health check
-#
-#  Other Intelligent Contracts can use this as a reference
-#  for integrating external APIs with proper Equivalence
-#  Principle patterns.
-#
-#  Requirements met:
-#    ✅ Optimistic Democracy consensus
-#    ✅ Equivalence Principle (gl.vm.run_nondet_unsafe)
-# ============================================================
-
 import json
 from genlayer import *
 
 
 class GenLayerAPIToolkit(gl.Contract):
 
-    # ── State ──────────────────────────────────────────────
-    owner: str
+    owner: Address
     query_count: u256
-    query_log: DynArray[str]   # "type:input:result"
+    query_log: DynArray[str]  # "type:input:result"
 
-    # ── Constructor ────────────────────────────────────────
-    def __init__(self, owner_address: str):
+    def __init__(self, owner_address: Address):
         self.owner = owner_address
         self.query_count = u256(0)
-
-    # ══════════════════════════════════════════════════════
-    #  READ FUNCTIONS
-    # ══════════════════════════════════════════════════════
 
     @gl.public.view
     def get_query_count(self) -> u256:
@@ -55,29 +28,18 @@ class GenLayerAPIToolkit(gl.Contract):
     @gl.public.view
     def get_toolkit_summary(self) -> str:
         return (
-            f"=== GenLayer API Toolkit ===\n"
+            f"GenLayer API Toolkit\n"
             f"Total Queries: {int(self.query_count)}\n"
             f"Available APIs:\n"
-            f"  - get_crypto_price(symbol) → CoinGecko\n"
-            f"  - get_weather(city) → wttr.in\n"
-            f"  - get_news_summary(topic) → Wikipedia\n"
-            f"  - get_github_stats(owner, repo) → GitHub\n"
-            f"  - check_url_health(url) → HTTP status"
+            f"  get_crypto_price(symbol) -> CoinGecko\n"
+            f"  get_weather(city) -> wttr.in\n"
+            f"  get_news_summary(topic) -> Wikipedia\n"
+            f"  get_github_stats(owner, repo) -> GitHub\n"
+            f"  check_url_health(url) -> HTTP status"
         )
-
-    # ══════════════════════════════════════════════════════
-    #  API 1 — CRYPTO PRICE FEED
-    #  Source: CoinGecko (no API key required)
-    #  Equivalence: price within ±2% (market movement)
-    # ══════════════════════════════════════════════════════
 
     @gl.public.write
     def get_crypto_price(self, coin_id: str) -> str:
-        """
-        Fetches the current price of a cryptocurrency from CoinGecko.
-        coin_id examples: bitcoin, ethereum, solana, genlayer
-        Equivalence: prices within ±2% are considered equivalent ✅
-        """
         def leader_fn():
             url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd&include_24hr_change=true"
             response = gl.nondet.web.get(url)
@@ -86,8 +48,8 @@ class GenLayerAPIToolkit(gl.Contract):
             if coin_id not in data:
                 return json.dumps({"coin": coin_id, "price_usd": 0, "change_24h": 0, "found": False})
 
-            price = float(data[coin_id].get("usd", 0))
-            change = float(data[coin_id].get("usd_24h_change", 0))
+            price = data[coin_id].get("usd", 0)
+            change = data[coin_id].get("usd_24h_change", 0)
 
             return json.dumps({
                 "coin": coin_id,
@@ -109,8 +71,8 @@ class GenLayerAPIToolkit(gl.Contract):
                 validator_price = validator_data["price_usd"]
                 if leader_price == 0:
                     return validator_price == 0
-                # ±2% tolerance for price movement between validators ✅
-                return abs(leader_price - validator_price) / leader_price <= 0.02
+                # price within 2%: abs(diff) * 100 <= price * 2
+                return abs(leader_price - validator_price) * 100 <= leader_price * 2
             except Exception:
                 return False
 
@@ -118,19 +80,8 @@ class GenLayerAPIToolkit(gl.Contract):
         self._log_query("crypto", coin_id, raw)
         return raw
 
-    # ══════════════════════════════════════════════════════
-    #  API 2 — WEATHER DATA
-    #  Source: wttr.in (free, no API key)
-    #  Equivalence: same condition + temp within ±3°C
-    # ══════════════════════════════════════════════════════
-
     @gl.public.write
     def get_weather(self, city: str) -> str:
-        """
-        Fetches current weather for any city using wttr.in.
-        city examples: London, Tokyo, "New York", Mexico City
-        Equivalence: same condition + temperature ±3°C ✅
-        """
         def leader_fn():
             safe_city = city.replace(" ", "+")
             url = f"https://wttr.in/{safe_city}?format=j1"
@@ -160,10 +111,7 @@ class GenLayerAPIToolkit(gl.Contract):
                 validator_raw = leader_fn()
                 leader_data = json.loads(leader_result.calldata)
                 validator_data = json.loads(validator_raw)
-                # Temperature within ±3°C ✅
-                if abs(leader_data["temp_c"] - validator_data["temp_c"]) > 3:
-                    return False
-                return True
+                return abs(leader_data["temp_c"] - validator_data["temp_c"]) <= 3
             except Exception:
                 return False
 
@@ -171,21 +119,10 @@ class GenLayerAPIToolkit(gl.Contract):
         self._log_query("weather", city, raw)
         return raw
 
-    # ══════════════════════════════════════════════════════
-    #  API 3 — NEWS SUMMARY
-    #  Source: Wikipedia Current Events
-    #  Equivalence: LLM summary judged by prompt_comparative
-    # ══════════════════════════════════════════════════════
-
     @gl.public.write
     def get_news_summary(self, topic: str) -> str:
-        """
-        Fetches and summarizes recent news about a topic
-        using Wikipedia's current events portal.
-        Equivalence: key facts must match, wording may differ ✅
-        """
         def leader_fn():
-            url = f"https://en.wikipedia.org/wiki/Portal:Current_events"
+            url = "https://en.wikipedia.org/wiki/Portal:Current_events"
             response = gl.nondet.web.get(url)
             web_data = response.body.decode("utf-8")[:3000]
 
@@ -221,7 +158,6 @@ No extra text."""
                 validator_raw = leader_fn()
                 leader_data = json.loads(leader_result.calldata)
                 validator_data = json.loads(validator_raw)
-                # found field must match ✅
                 return leader_data["found"] == validator_data["found"]
             except Exception:
                 return False
@@ -230,18 +166,8 @@ No extra text."""
         self._log_query("news", topic, raw)
         return raw
 
-    # ══════════════════════════════════════════════════════
-    #  API 4 — GITHUB STATS
-    #  Source: GitHub API (no auth needed for public repos)
-    #  Equivalence: stars within ±10, same language
-    # ══════════════════════════════════════════════════════
-
     @gl.public.write
     def get_github_stats(self, owner: str, repo: str) -> str:
-        """
-        Fetches public stats for any GitHub repository.
-        Equivalence: stars within ±10, same language ✅
-        """
         def leader_fn():
             url = f"https://api.github.com/repos/{owner}/{repo}"
             response = gl.nondet.web.get(url)
@@ -269,10 +195,8 @@ No extra text."""
                 validator_data = json.loads(validator_raw)
                 if not leader_data["found"]:
                     return not validator_data["found"]
-                # Stars within ±10 (new stars between validator runs) ✅
                 if abs(leader_data["stars"] - validator_data["stars"]) > 10:
                     return False
-                # Language must match exactly
                 return leader_data["language"] == validator_data["language"]
             except Exception:
                 return False
@@ -281,19 +205,8 @@ No extra text."""
         self._log_query("github", f"{owner}/{repo}", raw)
         return raw
 
-    # ══════════════════════════════════════════════════════
-    #  API 5 — URL HEALTH CHECK
-    #  Checks if a URL is accessible and returns content length
-    #  Equivalence: content length within ±500 chars
-    # ══════════════════════════════════════════════════════
-
     @gl.public.write
     def check_url_health(self, url: str) -> str:
-        """
-        Checks if a URL is accessible and measures response size.
-        Useful for monitoring external data sources used in contracts.
-        Equivalence: content length within ±500 chars ✅
-        """
         def leader_fn():
             try:
                 response = gl.nondet.web.get(url)
@@ -319,10 +232,8 @@ No extra text."""
                 validator_raw = leader_fn()
                 leader_data = json.loads(leader_result.calldata)
                 validator_data = json.loads(validator_raw)
-                # Accessibility must match ✅
                 if leader_data["accessible"] != validator_data["accessible"]:
                     return False
-                # Content length within ±500 chars ✅
                 return abs(leader_data["content_length"] - validator_data["content_length"]) <= 500
             except Exception:
                 return False
@@ -330,10 +241,6 @@ No extra text."""
         raw = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
         self._log_query("health", url, raw)
         return raw
-
-    # ══════════════════════════════════════════════════════
-    #  INTERNAL HELPERS
-    # ══════════════════════════════════════════════════════
 
     def _log_query(self, query_type: str, input_data: str, result: str) -> None:
         safe_input = input_data[:50].replace(":", "-")
