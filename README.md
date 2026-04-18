@@ -55,6 +55,8 @@ Each API has different characteristics that affect how validators will see the d
 4. Deploy with your address as `owner_address`
 5. Call any of the API functions
 
+Note: the contract in this repository uses the Address type in the constructor as required by genvm-lint. When deploying in GenLayer Studio use a version that receives str in the constructor and converts internally with Address(owner_address) since Studio requires primitive types to parse the contract schema correctly.
+
 ## Notes
 
 This is part of the GenLayer Incentivized Builder Program, Tools & Infrastructure track. All 5 APIs were tested and achieved 100% consensus rate in GenLayer Studio.
